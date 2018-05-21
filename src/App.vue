@@ -5,33 +5,29 @@
       <div class="filtering">
         <div>Show OK <switches theme="bulma" :color="showWorking ? 'blue' : 'default'" v-model="showWorking"/></div>
         <div>Show BROKEN <switches theme="bulma" :color="showBroken ? 'blue' : 'default'" v-model="showBroken"/></div>
-        <div>Open all <switches theme="bulma" :color="showAll ? 'blue' : 'default'" v-model="showAll"/></div>
       </div>
       <div>
-        <div class="link__group" v-for="(links, source) in showItems" :key="source">
-        <div class="link__source">
-          <div class="link__source__name" @click="open(source)">{{ source }}</div>
-          <div class="link__total">total: {{ items[source].links.length }}</div>
+        <div class="link__group" v-for="(item, index) in items" :key="index">
+        <div class="link__source" :class="item.links.some(el => !el.status) ? 'red' : 'green'">
+          <div class="link__source__name" @click="open(index)">{{ item.source }}</div>
+          <div class="link__total">total: {{ item.links.length }}</div>
         </div>
-        <template v-if="items[source].opened || showAll">
-          <div class="link__item" v-for="(item, index) in links" :key="index">
-            <div class="link__status" :class="item.status ? 'green' : 'red'">{{ item.status ? 'OK' : 'BROKEN' }}</div>
-            <div class="link__url"> {{ item.href }}</div>
-          </div>
-        </template>
+        <div class="link__item" v-if="(!link.status && showBroken) || (link.status && showWorking) || index === expanded" v-for="(link, index) in item.links" :key="index">
+          <div class="link__status" :class="link.status ? 'green' : 'red'">{{ link.status ? 'OK' : 'BROKEN' }}</div>
+          <div class="link__url"> {{ link.href }}</div>
+        </div>
       </div>
       </div>
     </template>
 
-    <template v-else>
+    <form novalidate @submit.prevent v-else>
       <input type="text" v-model="value">
-      <button @click="send">Check me some asaps</button>
-    </template>
+      <button type="submit" @click="send">Crawl website</button>
+    </form>
   </div>
 </template>
 
 <script>
-import Vue from 'vue';
 import Switches from 'vue-switches';
 
 export default {
@@ -41,64 +37,45 @@ export default {
   },
   data() {
     return {
-      value: '',
+      value: 'https://www.asaptickets.com',
       active: false,
       showBroken: true,
       showWorking: false,
-      showAll: true,
-      items: {}
-    }
-  },
-  computed: {
-    showItems() {
-      return Object.entries(this.items).reduce((acc, entry) => {
-        const [ key, value ] = entry;
-        acc[key] = value.links.filter(link => {
-          return (link.status && this.showWorking) || (!link.status && this.showBroken);
-        });
-
-        return acc;
-      }, {});
+      expanded: -1,
+      items: [],
     }
   },
   methods: {
     send() {
-      this.$socket.emit("blc", this.value);
-      this.active = true;
+      if (!this.active) {
+          this.active = true;
+          this.$socket.emit("blc", this.value);
+      }
     },
-    open(source) {
-      this.items[source].opened = !this.items[source].opened;
+    open(index) {
+      if (this.expanded === index) {
+          this.expanded = -1;
+      } else {
+          this.expanded = index;
+      }
     }
   },
   socket: {
     events: {
       'blc-status'(data) {
         const { url, links } = data;
-
-        if(url && links) {
-          this.value = url;
-          this.active = true;
-
-          this.items = Object.entries(links).reduce((acc, el) => {
-            const [key, value] = el;
-            acc[key] = {
-              opened: false,
-              links: value
-            };
-
-            return acc;
-          }, {});
-        }
+        this.url = url;
+        this.links = links;
+      },
+      'blc-new-group'(source) {
+          this.items.push({
+              source,
+              links: []
+          });
       },
       'blc-response'(key, value) {
-        if (!this.items.hasOwnProperty(key)) {
-          Vue.set(this.items, key, {
-            opened: false,
-            links: []
-          });
-        }
-
-        this.items[key].links.push(value);
+        this.active = true;
+        this.items.find(el => el.source === key).links.push(value);
       }
     }
   }
@@ -106,8 +83,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.green { color: green; }
-.red { color: red; }
 
 .filtering {
   div {
@@ -120,20 +95,6 @@ export default {
   &__group {
     margin-top: 15px;
     border: 1px solid grey;
-
-    $colors: #ea6153, #27ae60, #2980b9;
-
-    @each $color in $colors {
-      $length: length($colors);
-      $index: index($colors, $color);
-
-      &:nth-child(#{$length}n + #{$index}) {
-        
-        .link__source {
-          background: $color;
-        }
-      }
-    }
   }
 
   &__source {
@@ -141,7 +102,14 @@ export default {
     display: flex;
     justify-content: space-between;
     color: white;
-    background: black;
+
+    &.green {
+      background: #27ae60;
+    }
+
+    &.red {
+      background: #ea6153;
+    }
 
     &__name {
       flex-grow: 1;
@@ -160,6 +128,9 @@ export default {
 
   &__status {
     width: 80px;
+
+    &.green { color: green; }
+    &.red { color: red; }
   }
 
   &__total {

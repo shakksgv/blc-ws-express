@@ -9,18 +9,22 @@ router.get('/status', function(req, res) {
 });
 
 app.use("/", router);
-app.use(express.static('dist'))
+app.use(express.static('dist'));
 
 const server = app.listen(8080);
 const io = require('socket.io')(server);
 
-let links = {};
+let links = [];
 let url = '';
 
 io.on('connection', function (socket) {
     socket.emit('blc-status', { url, links });
 
     socket.on('blc', req => {
+        if (this.url) {
+            return;
+        }
+
         const siteChecker = new blc.SiteChecker({
             excludeExternalLinks: true,
             excludedKeywords: [
@@ -29,19 +33,26 @@ io.on('connection', function (socket) {
             ]
         }, {
             link(result) {
-                const source = result.base.original.replace(url, '/');
-                const link = {
-                    href: result.url.original,
-                    status: !result.broken
-                };
+                if (!result.http.cached) {
+                    const source = result.base.original;
+                    const link = {
+                        href: result.url.original,
+                        status: !result.broken
+                    };
 
-                io.sockets.emit('blc-response', source, link);
-                
-                if (!links.hasOwnProperty(source)) {
-                    links[source] = [];
+                    if (!links.some(el => el.source === source)) {
+                        io.sockets.emit('blc-new-group', source);
+                        links.push({
+                            source,
+                            links: [link],
+                            total: 0
+                        });
+                    } else {
+                        links.find(el => el.source === source).links.push(link);
+                    }
+
+                    io.sockets.emit('blc-response', source, link);
                 }
-
-                links[source].push(link);
             }
         });
 
