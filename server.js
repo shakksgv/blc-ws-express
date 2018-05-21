@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const blc = require('broken-link-checker');
 
+const PORT = process.env.PORT || 5000;
 const app = express();
 
 router.get('/status', function(req, res) {
@@ -11,7 +12,7 @@ router.get('/status', function(req, res) {
 app.use("/", router);
 app.use(express.static('dist'));
 
-const server = app.listen(8080);
+const server = app.listen(PORT);
 const io = require('socket.io')(server);
 
 let links = [];
