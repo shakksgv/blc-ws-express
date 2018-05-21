@@ -5,6 +5,7 @@
       <div class="filtering">
         <div>Show OK <switches theme="bulma" :color="showWorking ? 'blue' : 'default'" v-model="showWorking"/></div>
         <div>Show BROKEN <switches theme="bulma" :color="showBroken ? 'blue' : 'default'" v-model="showBroken"/></div>
+        <button @click="cancel">Cancel</button>
       </div>
       <div>
         <div class="link__group" v-for="(item, index) in items" :key="index">
@@ -37,7 +38,7 @@ export default {
   },
   data() {
     return {
-      value: 'https://www.asaptickets.com',
+      value: 'https://m.africa.asaptickets.com',
       active: false,
       showBroken: true,
       showWorking: false,
@@ -58,6 +59,9 @@ export default {
       } else {
           this.expanded = index;
       }
+    },
+    cancel() {
+      this.$socket.emit('blc-cancel');
     }
   },
   socket: {
@@ -65,7 +69,7 @@ export default {
       'blc-status'(data) {
         const { url, links } = data;
         this.url = url;
-        this.links = links;
+        this.items = links;
       },
       'blc-new-group'(source) {
           this.items.push({
@@ -75,7 +79,9 @@ export default {
       },
       'blc-response'(key, value) {
         this.active = true;
-        this.items.find(el => el.source === key).links.push(value);
+        this.items.find(el => {
+          return el.source === key;
+        }).links.push(value);
       }
     }
   }
