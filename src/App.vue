@@ -38,7 +38,7 @@ export default {
   },
   data() {
     return {
-      value: 'https://m.africa.asaptickets.com',
+      value: 'https://example.com',
       active: false,
       showBroken: true,
       showWorking: false,
